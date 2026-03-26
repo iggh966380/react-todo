@@ -1,0 +1,9 @@
+.d-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bottom-l {
+  border-bottom: 1px solid #ddd;
+}
