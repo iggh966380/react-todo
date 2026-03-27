@@ -7,3 +7,7 @@
 .bottom-l {
   border-bottom: 1px solid #ddd;
 }
+
+.completed {
+  text-decoration: line-through;
+}

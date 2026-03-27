@@ -1,63 +1,130 @@
-import { useState } from "react";
-// import reactLogo from './assets/react.svg'
-// import viteLogo from './assets/vite.svg'
-// import heroImg from './assets/hero.png'
+import { useEffect, useState } from "react";
+import { getTodos, createTodo, updateTodo, deleteTodo } from "./api/todo.ts";
 import "./App.css";
 
-function App() {
-  const [todoList, setTodoList] = useState([
-    {
-      todoContent: "",
-      index: 1,
-      id: 1,
+const createEmptyTodo = (length) => {
+  return {
+    todoContent: "",
+    id: Date.now(),
+    isAddMode: false,
+    index: length,
+    inputValue: "",
+  };
+};
+
+const formatTodos = (todos) =>
+  todos
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .map((t, i) => ({
+      todoContent: t.content,
+      id: t.id,
+      isCompleted: t.isCompleted,
       isAddMode: false,
-    },
-  ]);
-  const [userInput, setUserInput] = useState("");
+      inputValue: "",
+      index: i + 1,
+    }));
+
+function App() {
+  const [todoList, setTodoList] = useState([createEmptyTodo(1)]);
+  useEffect(() => {
+    getTodos().then((res) => {
+      setTodoList([...formatTodos(res.data), createEmptyTodo(2)]);
+    });
+  }, []);
+  const onDeleteTodo = async (id) => {
+    await deleteTodo(id);
+    const newTodo = await getTodos();
+    setTodoList([
+      ...formatTodos(newTodo.data).map((t, i) => ({ ...t, index: i + 1 })),
+      createEmptyTodo(1),
+    ]);
+  };
+  const saveTodo = async (todo) => {
+    const isNew = todo.todoContent.length === 0;
+    if (isNew) {
+      todo.todoContent = todo.inputValue;
+      await createTodo(todo.todoContent);
+    } else {
+      await updateTodo(todo.id, {
+        content: todo.inputValue,
+        isCompleted: todo.isCompleted,
+      });
+    }
+    const res = await getTodos();
+    setTodoList([
+      ...formatTodos(res.data),
+      createEmptyTodo(todoList.length + 1),
+    ]);
+    console.log(todoList);
+  };
+
+  const updateLocal = (id, changes) => {
+    setTodoList(todoList.map((t) => (t.id === id ? { ...t, ...changes } : t)));
+  };
+
+  const setToDoComplete = async (todo, completed) => {
+    updateLocal(todo.id, { isCompleted: completed });
+
+    try {
+      await updateTodo(todo.id, {
+        isCompleted: completed,
+      });
+    } catch {
+      updateLocal(todo.id, { isCompleted: !completed });
+      alert("更新失敗");
+    }
+  };
   const todoTemplate = todoList.map((todo) => (
-    <li className="d-flex bottom-l" key={todo.index}>
+    <li className="d-flex bottom-l" key={todo.id}>
       {todo.isAddMode ? (
         <input
           type="text"
           onInput={(e) => {
-            setUserInput(e.target.value);
+            updateLocal(todo.id, { inputValue: e.target.value });
           }}
+          value={todo.inputValue ?? todo.todoContent}
         ></input>
       ) : (
         <div>
-          {todo.todoContent ? todo.index : undefined}. {todo.todoContent}
+          {todo.todoContent.length > 0 ? (
+            <input
+              type="checkbox"
+              onClick={(e) => {
+                setToDoComplete(todo, e.target.checked);
+              }}
+            />
+          ) : undefined}{" "}
+          {todo.todoContent ? `${todo.index}.` : undefined}
+          <span className={`todo-item ${todo.isCompleted ? "completed" : ""}`}>
+            {todo.todoContent}
+          </span>
         </div>
       )}
       <div>
         {todo.todoContent.length === 0 && !todo.isAddMode && (
           <button
             onClick={() => {
-              setTodoList(
-                todoList.map((t) =>
-                  t.index === todo.index ? { ...t, isAddMode: true } : t,
-                ),
-              );
+              updateLocal(todo.id, { isAddMode: true });
             }}
           >
             +新增
           </button>
         )}
-        {todo.todoContent.length !== 0 ? (
+        {todo.todoContent.length !== 0 && !todo.isAddMode ? (
           <div>
             <button
               onClick={() => {
-                setTodoList(todoList.filter((t) => t.id !== todo.id));
+                updateLocal(todo.id, {
+                  isAddMode: true,
+                  inputValue: todo.todoContent,
+                });
               }}
             >
               編輯
             </button>
             <button
               onClick={() => {
-                setTodoList(
-                  todoList
-                    .filter((t) => t.id !== todo.id)
-                    .map((t, index) => ({ ...t, index: index + 1 })),
-                );
+                onDeleteTodo(todo.id);
               }}
             >
               刪除
@@ -68,30 +135,14 @@ function App() {
           <div>
             <button
               onClick={() => {
-                setTodoList([
-                  ...todoList.map((t) =>
-                    t.id === todo.id
-                      ? { ...t, todoContent: userInput, isAddMode: false }
-                      : t,
-                  ),
-                  {
-                    todoContent: "",
-                    id: Date.now(),
-                    isAddMode: false,
-                    index: todoList.length + 1,
-                  },
-                ]);
+                saveTodo(todo);
               }}
             >
               儲存
             </button>
             <button
               onClick={() => {
-                setTodoList(
-                  todoList.map((t) =>
-                    t.id === todo.id ? { ...t, isAddMode: false } : t,
-                  ),
-                );
+                updateLocal(todo.id, { isAddMode: false });
               }}
             >
               取消
